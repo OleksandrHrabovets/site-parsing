@@ -18,11 +18,23 @@ public class FashionistaWebParser {
   private String url;
 
   @PostConstruct
-  public Elements parseUrl() throws IOException {
+  public Elements parseUrlByClass() throws IOException {
 
     Document document = Jsoup.connect(url).get();
-    Elements elementsByClass = document.getElementsByClass("product-title");
-    elementsByClass.forEach(element -> log.info("Element: {}", element));
+    String className = "product-title";
+    Elements elementsByClass = document.getElementsByClass(className);
+    elementsByClass.forEach(element -> log.info("Element by class '{}': {}", className, element));
+    return elementsByClass;
+
+  }
+
+  @PostConstruct
+  public Elements parseUrlByAttribute() throws IOException {
+
+    Document document = Jsoup.connect(url).get();
+    String attr = "href";
+    Elements elementsByClass = document.getElementsByAttribute(attr);
+    elementsByClass.forEach(element -> log.info("Element by attribute '{}': {}", attr,  element));
     return elementsByClass;
 
   }
