@@ -3,7 +3,9 @@ package ua.oh.siteparsing.service;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -53,21 +55,26 @@ public class FashionistaWebParser {
     String query = "article";
     Elements elementsBySelect = document.select(query);
 
-    return elementsBySelect.stream().map(element -> {
-          String idString = element.attr("data-id-product");
-          String title = element.getElementsByClass(PRODUCT_TITLE).first().text();
-          String href = element.getElementsByClass(PRODUCT_TITLE).first().childNodes().get(0)
-              .attr("href");
-          String description = element.getElementsByClass("product-description-short").first().text();
-          String priceString = element.getElementsByClass("price").first().childNodes().get(2)
-              .attr("content");
-          ProductRecord productRecord = new ProductRecord(Long.parseLong(idString), title, description,
-              href, Double.parseDouble(priceString), parseProductColors(href), parseProductSizes(href));
-          log.info("Product {}", productRecord);
-          return productRecord;
-        }
-    ).toList();
+    return elementsBySelect.stream()
+        .map(this::mapToProductRecord
+        ).toList();
 
+  }
+
+  private ProductRecord mapToProductRecord(Element element) {
+    String idString = element.attr("data-id-product");
+    String title = element.getElementsByClass(PRODUCT_TITLE).first().text();
+    String href = element.getElementsByClass(PRODUCT_TITLE).first().childNodes().get(0)
+        .attr("href");
+    String description = element.getElementsByClass("product-description-short").first().text();
+    String priceString = element.getElementsByClass("price").first().childNodes().get(2)
+        .attr("content");
+    List<Color> colors = parseProductColors(href);
+    ProductRecord productRecord = new ProductRecord(Long.parseLong(idString), title, description,
+        href, Double.parseDouble(priceString), colors, parseProductSizes(href),
+        parseProductImages(href, colors));
+    log.info("Product {}", productRecord);
+    return productRecord;
   }
 
   @SneakyThrows
@@ -80,6 +87,28 @@ public class FashionistaWebParser {
         .forEach(color -> list.add(new Color(color.text(),
             color.attr("style").substring("background-color: ".length())))));
     return list;
+
+  }
+
+  @SneakyThrows
+  private Map<Color, List<String>> parseProductImages(String url, List<Color> colors) {
+    final String[] colorString = {""};
+    Map<Color, List<String>> images = new HashMap<>();
+    List<String> list = new ArrayList<>();
+
+    Document document = Jsoup.connect(url).get();
+    Elements elements = document.getElementsByClass("product-thumb-images");
+    elements.forEach(element -> element.getElementsByClass("thumb")
+        .forEach(image -> {
+          list.add(image.attr("data-image-large-src"));
+          String[] array = image.attr("alt").split(" ");
+          colorString[0] = array[array.length - 1];
+
+        }));
+    images.put(colors.stream()
+        .filter(color -> color.name.toLowerCase().equals(colorString[0])).findFirst()
+        .orElseThrow(), list);
+    return images;
 
   }
 
@@ -97,7 +126,8 @@ public class FashionistaWebParser {
 
 
   public record ProductRecord(Long id, String title, String Description, String url, Double price,
-                              List<Color> colors, List<String> sizes) {
+                              List<Color> colors, List<String> sizes,
+                              Map<Color, List<String>> images) {
 
   }
 
